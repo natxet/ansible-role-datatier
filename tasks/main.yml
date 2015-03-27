@@ -1,0 +1,62 @@
+---
+
+- name: All needed packages for MySQL are installed in their latest versions
+  apt: pkg={{ item }} state=latest
+  with_items:
+    - python-mysqldb
+    - mysql-common
+    - mysql-server
+    - mysql-server-core
+    - mysql-client
+  notify:
+    - ensure mysql
+    - restart mysql
+  when: "mysql_version != '5.6'"
+
+- name: All needed packages for MySQL are installed in their latest versions
+  apt: pkg={{ item }} state=latest
+  with_items:
+    - python-mysqldb
+    - mysql-common-5.6
+    - mysql-server-5.6
+    - mysql-server-core-5.6
+    - mysql-client-5.6
+    - mysql-client-core-5.6
+  notify:
+    - ensure mysql
+    - restart mysql
+  when: "mysql_version == '5.6'"
+
+- name: MySQL root user´s password is reset to the one defined in vars/main.yml
+  mysql_user:
+    name: root
+    host: "{{ item }}"
+    password: "{{ mysql_root_password }}"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    check_implicit_admin: yes
+    priv: "*.*:ALL,GRANT"
+  with_items:
+    - "{{ ansible_hostname }}"
+    - 127.0.0.1
+    - ::1
+    - localhost
+
+- name: The .my.cnf file is placed in the home of user with mysql root credentials
+  sudo: no
+  template:
+    src: my.cnf
+    dest: "{{ ssh_home }}/.my.cnf"
+    owner: "{{ ssh_user }}"
+    mode: 0600
+
+- name: The test database is not present
+  sudo: no
+  mysql_db: name=test state=absent
+
+- name: Anonymous users are not granted access to MySQL
+  sudo: no
+  mysql_user: name='' host={{ item }} state=absent
+  with_items:
+    - localhost
+    - "{{ inventory_hostname }}"
